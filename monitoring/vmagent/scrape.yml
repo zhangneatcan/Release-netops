@@ -1,29 +1,45 @@
+# Nexora vmagent 抓取配置模板
+#
+# 这份文件是"模板"——运行时实际的 scrape.yml 由
+# backend/services/monitoring_compiler.py 基于数据库里的采集计划
+# 编译生成，写到 nexora-monitoring-artifacts 共享卷里，vmagent 从卷里读。
+#
+# 编辑这份模板只影响"首次部署"或"未编译前的默认值"。
+# 生效的实际配置请改数据库：
+#   monitoring_collection_plans.config_json 里的 modules[].interval / scrape_timeout
+# 然后调用 compile_collector + publish_collector 重新编译。
+
+# ── 全局默认值 ─────────────────────────────────────────────────────
+# 每个 job 可以单独覆盖；没覆盖的用这里的值。
 global:
-<<<<<<< HEAD
+  # 所有抓取的默认间隔。SNMP job 会用自己的 nexora_scrape_interval 覆盖。
   scrape_interval: 300s
+  # 默认单次抓取超时。SNMP job 会用自己的 nexora_scrape_timeout 覆盖。
   scrape_timeout: 120s
-=======
-  scrape_interval: 60s
-  scrape_timeout: 30s
->>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
 scrape_configs:
+  # ── 网络设备 SNMP 采集 ───────────────────────────────────────────
+  # 每台设备的真实 interval / timeout 由 target 的 label
+  # nexora_scrape_interval / nexora_scrape_timeout 决定（来自编译产物）。
   - job_name: network_snmp
     file_sd_configs:
       - files:
           - /etc/nexora-collector/runtime/vmagent/targets/snmp_targets.yml
     metrics_path: /snmp
     relabel_configs:
+      # 把 target 的地址/模块/认证传给 snmp-exporter 的查询参数。
       - source_labels: [__address__]
         target_label: __param_target
       - source_labels: [nexora_module]
         target_label: __param_module
       - source_labels: [nexora_auth]
         target_label: __param_auth
+      # 每 target 独立控制 interval / timeout。
       - source_labels: [nexora_scrape_interval]
         target_label: __scrape_interval__
       - source_labels: [nexora_scrape_timeout]
         target_label: __scrape_timeout__
+      # 把有价值的业务标签投影到指标上。
       - source_labels: [__param_target]
         target_label: instance
       - source_labels: [nexora_asset_id]
@@ -42,11 +58,14 @@ scrape_configs:
         target_label: platform
       - source_labels: [nexora_role]
         target_label: role
+      # 清理所有中间标签，避免污染时序库。
       - action: labeldrop
         regex: nexora_auth|nexora_.*
+      # 真正的抓取目标指向 snmp-exporter，而不是设备本身。
       - target_label: __address__
         replacement: snmp-exporter:9116
 
+  # ── Linux 服务器（node_exporter） ────────────────────────────────
   - job_name: linux_servers
     scrape_interval: 15s
     scrape_timeout: 10s
@@ -56,7 +75,7 @@ scrape_configs:
           - /etc/nexora-collector/runtime/vmagent/targets/*linux*.yml
           - /etc/nexora-collector/runtime/vmagent/targets/*server*.yml
 
-
+  # ── Windows 服务器（windows_exporter） ───────────────────────────
   - job_name: windows_servers
     scrape_interval: 15s
     scrape_timeout: 10s
@@ -65,8 +84,11 @@ scrape_configs:
       - files:
           - /etc/nexora-collector/runtime/vmagent/targets/*windows*.yml
 
-  # Docker control-plane telemetry belongs only to collector-local. The
-  # runtime compiler adds the same targets only for collector-local artifacts.
+  # ── 平台内部服务自监控 ───────────────────────────────────────────
+  # 这些固定抓取 Docker 内部服务；只在 collector-local 产物中出现。
+  # Docker 控制面的遥测只属于 collector-local。运行时编译器只会为
+  # collector-local 的产物添加这些固定 target。
+
   - job_name: platform_api
     scrape_interval: 30s
     scrape_timeout: 10s
@@ -75,6 +97,7 @@ scrape_configs:
       - targets: ["netops:8003"]
 
   - job_name: platform_hardware_inventory
+    # 硬件清单接口响应比较大，单独给 60s / 30s。
     scrape_interval: 60s
     scrape_timeout: 30s
     metrics_path: /hardware-metrics
@@ -105,8 +128,8 @@ scrape_configs:
   - job_name: platform_grafana
     scrape_interval: 30s
     scrape_timeout: 10s
-    # Grafana serves from /grafana and redirects a bare /metrics request to
-    # the public root_url. Scrape the internal service directly at its subpath.
+    # Grafana 从 /grafana 子路径提供服务，裸 /metrics 会重定向到 root_url。
+    # 直接抓内部服务时走它的子路径。
     metrics_path: /grafana/metrics
     static_configs:
       - targets: ["grafana:3000"]

@@ -2747,6 +2747,19 @@ def create_asset(body: AssetCreate, _user=require_role("Operator")):
             details={'asset_type': body.asset_type, 'source': 'api'},
         )
         conn.commit()
+
+        # ── 自动纳管：让新建/在线设备立刻出现在 UI ──
+        if device_id:
+            try:
+                conn.execute("""
+                    UPDATE devices SET is_managed = 1
+                    WHERE id = ? AND status = 'online'
+                      AND platform IS NOT NULL AND platform != ''
+                      AND is_managed = 0
+                """, (device_id,))
+                conn.commit()
+            except Exception as exc:
+                logger.warning(f"[AutoManage] create_asset 自动纳管失败: {exc}")
         try:
             from services.collector_sync_service import trigger_async_monitoring_sync
             trigger_async_monitoring_sync()
@@ -3620,7 +3633,23 @@ def import_assets(
                     continue
                 conn.rollback()
                 raise
+        # ═══ 批量导入后自动纳管 ═══
+        # 把所有本次导入 + 在线 + 有 platform 的设备标记为 is_managed=1
+        # 一次性批量 UPDATE，避免逐行 UPDATE
+        try:
+            updated = conn.execute("""
+                UPDATE devices SET is_managed = 1
+                WHERE status = 'online'
+                  AND platform IS NOT NULL AND platform != ''
+                  AND is_managed = 0
+            """).rowcount
+            if updated:
+                logger.info(f"[AssetImport] 自动纳管 {updated} 台在线设备")
+        except Exception as exc:
+            logger.warning(f"[AssetImport] 自动纳管失败: {exc}", exc_info=True)
+
         conn.commit()
+
 
         async def _sync_imported_hostname(item: dict, semaphore) -> dict:
             result = {
