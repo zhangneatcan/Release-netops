@@ -6,6 +6,10 @@ if os.environ.get("NODE_ENV") == "development":
     sys.dont_write_bytecode = True
 
 # Add backend directory to sys.path to resolve core, api, services, etc.
+<<<<<<< HEAD
+=======
+# SOCKS proxy support initialized
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Explicit MIME mappings keep the SPA assets consistent across Nginx and the
@@ -91,6 +95,10 @@ from api.knowledge_response import is_stable_api_path, stable_error_payload
 from services.scheduler_service import sync_scheduler_jobs, run_scheduled_automation_job_sync_wrapper
 from engine.orchestrator import get_telemetry_orchestrator
 import logging
+<<<<<<< HEAD
+=======
+import os
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 import asyncio
 import json
 import uuid
@@ -106,6 +114,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
+<<<<<<< HEAD
 
 # 初始化日志配置
 setup_logging()
@@ -118,18 +127,84 @@ logger = logging.getLogger(__name__)
 # so the Docker healthcheck can pass while projections, evidence-graph
 # rebuilds, PAM recovery and CMDB synchronization continue in the
 # background at their own pace.
+=======
+# SNMP Imports removed for stability
+
+
+# 初始化日志配置
+setup_logging()
+logger = logging.getLogger(__name__) 
+
+# ── Startup ──
+
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 async def _bg_init():
     """
     Background initialization to avoid blocking startup.
     """
+<<<<<<< HEAD
     # 1. Official template projection (idempotent, safe on every start).
+=======
+    try:
+        # Database schema/migrations are ready by the time background startup
+        # runs. Initialize telemetry caches here instead of at module import,
+        # so pytest collection and lightweight imports do not query tables
+        # before the PostgreSQL test fixture has initialized them.
+        from services.background_monitor_service import _init_telemetry_state
+        _init_telemetry_state()
+        # Sync dynamic scheduled jobs from database
+        sync_scheduler_jobs(scheduler)
+        # Start status monitor loops (A/B Loops)
+        telemetry_orch = get_telemetry_orchestrator()
+        telemetry_orch.start_loops()
+        # Auto-sync monitoring collector targets from CMDB on startup
+        if os.environ.get("ENVIRONMENT") != "test" and "PYTEST_CURRENT_TEST" not in os.environ and "pytest" not in sys.modules:
+            try:
+                from services.collector_sync_service import sync_all_monitoring_collectors
+                sync_all_monitoring_collectors()
+                logger.info("[Background] Monitoring targets auto-synchronized from CMDB.")
+            except Exception as sync_exc:
+                logger.warning(f"[Background] Monitoring targets auto-sync failed: {sync_exc}")
+        logger.info("[Background] Core background tasks initialized.")
+    except Exception as e:
+        logger.error(f"[Background] Initialization failed: {e}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ── startup ──
+    validate_production_security()
+    logger.info(f"Starting up {settings.PROJECT_NAME} in {settings.ENVIRONMENT} mode...")
+    if settings.EXTERNAL_AI_ENABLED:
+        from ai.security.crypto import require_configured_master_key
+        require_configured_master_key()
+
+    # Initialize Database once
+    init_db()
+    load_persisted_security_policy()
+    try:
+        seed_data()
+        logger.info("Database seeding successfully checked/completed.")
+    except Exception as e:
+        logger.error(f"Database seeding failed: {e}", exc_info=True)
+
+    # Keep the reviewed configuration-template catalog searchable by the RAG
+    # engine as well as visible in the catalog UI.  The projection is
+    # idempotent and only publishes system-owned official templates, so it is
+    # safe on every startup and also repairs installations upgraded from a
+    # pre-projection release.
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     try:
         from services.official_template_projection_service import (
             project_official_templates_to_knowledge,
         )
 
+<<<<<<< HEAD
         projection = await asyncio.to_thread(
             project_official_templates_to_knowledge,
+=======
+        projection = project_official_templates_to_knowledge(
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
             tenant_id="tenant-default",
             created_by="system",
         )
@@ -138,17 +213,29 @@ async def _bg_init():
             projection.get("published_count", 0),
             projection.get("skipped_count", 0),
         )
+<<<<<<< HEAD
     except Exception as e:
         logger.warning(f"[Knowledge] Official template projection skipped: {e}", exc_info=True)
 
     # 2. Official product registry projection (idempotent).
     try:
+=======
+
+        # The product registry is a separate official-only projection.  It
+        # supplies the model hard-gate for Huawei, H3C and Cisco queries; the
+        # operation is idempotent and reconciles legacy Huawei rows without
+        # duplicating them.
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
         from services.official_product_catalog_service import (
             ensure_official_product_registry_documents,
         )
 
+<<<<<<< HEAD
         registry = await asyncio.to_thread(
             ensure_official_product_registry_documents,
+=======
+        registry = ensure_official_product_registry_documents(
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
             tenant_id="tenant-default",
             created_by="system",
         )
@@ -158,6 +245,7 @@ async def _bg_init():
             registry.get("model_counts", {}),
         )
     except Exception as e:
+<<<<<<< HEAD
         logger.warning(f"[Knowledge] Official product registry skipped: {e}", exc_info=True)
 
     # 3. Evidence graph backfill (may take minutes on large inventories).
@@ -246,6 +334,40 @@ async def lifespan(app: FastAPI):
     schedule_cfg = _get_schedule_from_db()
     scheduler.start()
 
+=======
+        # A catalog projection must not prevent the API from starting.  The
+        # catalog/import endpoints can retry after the database/provider is
+        # healthy, while the failure remains visible in server logs.
+        logger.warning(f"[Knowledge] Official template projection skipped: {e}", exc_info=True)
+
+    # Backfill the evidence-first knowledge graph from existing normalized
+    # topology observations.  Discovery runs call the same projection after
+    # every rebuild; startup makes already-collected evidence visible on
+    # installations upgraded after the graph tables were introduced.
+    try:
+        from services.topology_service import _sync_evidence_graph_from_observations
+        _sync_evidence_graph_from_observations()
+        logger.info("[Topology] Evidence graph projection synchronized.")
+    except Exception as e:
+        logger.warning(f"[Topology] Evidence graph projection skipped: {e}")
+    
+    # ── One-time PAM stale-session recovery ──
+    # After a server restart, sessions that were 'active' or 'connecting'
+    # are orphaned (no WebSocket is alive for them). Close them once here.
+    try:
+        from api.pam import recover_stale_sessions_on_startup
+        recover_stale_sessions_on_startup()
+    except Exception as e:
+        logger.warning(f"[PAM] Stale session recovery failed: {e}")
+
+
+    
+    # Start core components immediately
+    schedule_cfg = _get_schedule_from_db()
+    scheduler.start()
+    
+    # Register periodic jobs
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     from services.ip_locator_invalidation_service import process_pending_locator_invalidations
     from services.ip_locator_run_worker_service import process_pending_locator_runs
     from services.ip_locator_task_service import cleanup_locator_tasks
@@ -267,6 +389,10 @@ async def lifespan(app: FastAPI):
         'interval', seconds=storage_retry_seconds, id='config_snapshot_storage_retry',
         replace_existing=True, max_instances=1, coalesce=True,
     )
+<<<<<<< HEAD
+=======
+
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     scheduler.add_job(
         synchronized_scheduler_job('ip_locator_cache_invalidation', expire_seconds=60)(
             process_pending_locator_invalidations
@@ -288,6 +414,10 @@ async def lifespan(app: FastAPI):
         'interval', minutes=1, id='ip_locator_task_retention',
         replace_existing=True, max_instances=1, coalesce=True,
     )
+<<<<<<< HEAD
+=======
+
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     scheduler.add_job(
         synchronized_scheduler_job('host_resource_sampler', expire_seconds=55)(record_host_resource_snapshot),
         'interval', minutes=1, id='host_resource_sampler', replace_existing=True
@@ -297,6 +427,12 @@ async def lifespan(app: FastAPI):
         'interval', minutes=1, id='device_health_sampler', replace_existing=True
     )
 
+<<<<<<< HEAD
+=======
+    # AI model health is intentionally a low-frequency, bounded-cost probe.
+    # Each enabled chat/reasoning model gets a tiny request through the normal
+    # gateway so the UI can show model-specific health and a 24h SLA window.
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     from ai.services.model_health import run_scheduled_model_health_checks
     model_health_interval = max(1, int(getattr(settings, "AI_MODEL_HEALTH_INTERVAL_MINUTES", 10)))
     scheduler.add_job(
@@ -308,6 +444,14 @@ async def lifespan(app: FastAPI):
         replace_existing=True, max_instances=1, coalesce=True,
     )
 
+<<<<<<< HEAD
+=======
+    # Read-only database consistency and orphan patrol.  The job is bounded,
+    # never repairs rows, and is protected by the same cross-instance lock as
+    # the other maintenance jobs.  Findings are logged as counts/fingerprints
+    # only; operators use an approved migration or reconciliation action for
+    # any repair.
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     from database.consistency import run_scheduled_consistency_patrol
     scheduler.add_job(
         synchronized_scheduler_job('database_consistency_patrol', expire_seconds=23 * 3600)(
@@ -316,7 +460,11 @@ async def lifespan(app: FastAPI):
         'cron', hour=2, minute=25, id='database_consistency_patrol', replace_existing=True,
         max_instances=1, coalesce=True,
     )
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     from services.telemetry_service import record_device_telemetry_snapshot
     scheduler.add_job(
         synchronized_scheduler_job('device_telemetry_sampler', expire_seconds=55)(record_device_telemetry_snapshot),
@@ -360,11 +508,15 @@ async def lifespan(app: FastAPI):
         'interval', minutes=5, id='outbound_egress_sampler', replace_existing=True,
         max_instances=1, coalesce=True,
     )
+<<<<<<< HEAD
     if (
         os.environ.get("ENVIRONMENT") != "test"
         and "PYTEST_CURRENT_TEST" not in os.environ
         and "pytest" not in sys.modules
     ):
+=======
+    if os.environ.get("ENVIRONMENT") != "test" and "PYTEST_CURRENT_TEST" not in os.environ and "pytest" not in sys.modules:
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
         from services.collector_sync_service import sync_all_monitoring_collectors, trigger_async_monitoring_sync
         scheduler.add_job(
             synchronized_scheduler_job('monitoring_collector_auto_sync', expire_seconds=290)(sync_all_monitoring_collectors),
@@ -372,7 +524,10 @@ async def lifespan(app: FastAPI):
             max_instances=1, coalesce=True,
         )
         trigger_async_monitoring_sync(delay_seconds=3.0)
+<<<<<<< HEAD
 
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     from services.wan_link_service import run_wan_collection_once
     scheduler.add_job(
         synchronized_scheduler_job('wan_link_sampler', expire_seconds=55)(run_wan_collection_once),
@@ -380,10 +535,14 @@ async def lifespan(app: FastAPI):
         max_instances=1, coalesce=True,
     )
     from services.wan_p1_service import apply_wan_retention_once, ensure_wan_partitions_once, rollup_wan_samples_once
+<<<<<<< HEAD
     scheduler.add_job(
         synchronized_scheduler_job('wan_partition_maintenance', expire_seconds=900)(ensure_wan_partitions_once),
         'cron', hour=2, minute=10, id='wan_partition_maintenance', replace_existing=True
     )
+=======
+    scheduler.add_job(synchronized_scheduler_job('wan_partition_maintenance', expire_seconds=900)(ensure_wan_partitions_once), 'cron', hour=2, minute=10, id='wan_partition_maintenance', replace_existing=True)
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     scheduler.add_job(
         synchronized_scheduler_job('wan_rollup', expire_seconds=240)(rollup_wan_samples_once),
         'interval', minutes=5, id='wan_rollup', replace_existing=True,
@@ -410,9 +569,20 @@ async def lifespan(app: FastAPI):
         'cron', hour=4, minute=10, id='wan_capacity', replace_existing=True,
         max_instances=1, coalesce=True,
     )
+<<<<<<< HEAD
 
     reschedule_backup(schedule_cfg)
 
+=======
+    
+    reschedule_backup(schedule_cfg)
+    
+    # NSOT collection is intentionally not registered as several independent
+    # high-frequency system jobs.  The dynamic ``nsot`` scheduled action runs
+    # the same ordered workflow as the manual NSOT trigger once per day.  This
+    # avoids overlapping ARP, endpoint, route, topology, neighbor, and BGP
+    # collectors while keeping the manual trigger available.
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     from services.topology_service import TOPOLOGY_AUTOMATIC_INTERVAL_SECONDS
     from services.prefix_discovery_service import run_prefix_discovery_job
     scheduler.add_job(
@@ -424,7 +594,11 @@ async def lifespan(app: FastAPI):
         id='prefix_discovery_sync', replace_existing=True,
         max_instances=1, coalesce=True,
     )
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     from services.inspection_service import run_scheduled_inspections
     try:
         inspection_trigger = CronTrigger.from_crontab(settings.INSPECTION_MASTER_CRON)
@@ -438,7 +612,14 @@ async def lifespan(app: FastAPI):
         synchronized_scheduler_job('inspection_scheduler', expire_seconds=1700)(run_scheduled_inspections),
         inspection_trigger, id='inspection_scheduler', replace_existing=True
     )
+<<<<<<< HEAD
 
+=======
+    
+    # Do not register a daily no-op when credential rotation is disabled. This
+    # keeps the scheduler registry aligned with the features actually enabled
+    # for the deployment while preserving the job when the feature is on.
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     if settings.PASSWORD_ROTATION_ENABLED:
         from services.password_rotation_service import run_rotation_sweep
         scheduler.add_job(
@@ -448,13 +629,20 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("[Scheduler] Password rotation sweep disabled by configuration")
 
+<<<<<<< HEAD
     # Launch the background initializer.  It runs concurrently with the
     # request-serving loop and does not block the healthcheck.
+=======
+    # Launch background tasks
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     asyncio.create_task(_bg_init())
     logger.info("[Scheduler] APScheduler started (background init pending)")
 
     yield
+<<<<<<< HEAD
 
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     # ── shutdown ──
     try:
         from engine.orchestrator import get_telemetry_orchestrator
@@ -475,7 +663,10 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown(wait=False)
     logger.info("[Scheduler] APScheduler stopped")
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 from core.context import request_id_var, resolve_request_id, user_var, route_var
 from core.metrics import metrics_registry
 from core.scheduler_lock import synchronized_scheduler_job
@@ -541,7 +732,11 @@ async def add_request_id_and_log(request: Request, call_next):
     req_token = request_id_var.set(request_id)
     user_token = user_var.set("anonymous")
     route_token = route_var.set(request.url.path)
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     auth_start_time = time.perf_counter()
     auth = request.headers.get('Authorization', '')
     if auth.startswith('Bearer '):
@@ -587,12 +782,18 @@ async def add_request_id_and_log(request: Request, call_next):
         user_var.reset(user_token)
         route_var.reset(route_token)
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Global unhandled exception on {request.url.path}: {exc}", exc_info=True)
@@ -640,7 +841,10 @@ async def ai_exception_handler(request: Request, exc: AIException):
         },
     )
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
     # 注意：Pydantic v2 的 exc.errors() 在 ctx 里可能携带原始异常对象
@@ -654,6 +858,10 @@ async def validation_exception_handler(request, exc):
         loc = [str(x) for x in e.get('loc', ()) if x != 'body']
         field = loc[-1] if loc else ''
         msg = str(e.get('msg', '') or '参数校验失败')
+<<<<<<< HEAD
+=======
+        # 去掉 Pydantic 的 "Value error, " 前缀，让提示更简洁
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
         if msg.startswith('Value error, '):
             msg = msg[len('Value error, '):]
         messages.append(f"{field}：{msg}" if field else msg)
@@ -682,12 +890,19 @@ async def validation_exception_handler(request, exc):
         content={"detail": detail_msg, "errors": safe_errors},
     )
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 # CORS - restrict to known origins in production; permissive in dev
 _cors_origins = ["*"] if os.environ.get("NODE_ENV") == "development" else [
     f"http://localhost:{os.environ.get('PORT', '5010')}",
     f"http://127.0.0.1:{os.environ.get('PORT', '5010')}",
 ]
+<<<<<<< HEAD
+=======
+# In production, set CORS_ORIGINS env var to a comma-separated list of allowed origins
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 _env_origins = os.environ.get("CORS_ORIGINS", "").strip()
 if _env_origins:
     _cors_origins = [o.strip() for o in _env_origins.split(",") if o.strip()]
@@ -770,6 +985,11 @@ app.include_router(ai_v1_chat_router)
 # PAM WebSocket 单独注册
 app.include_router(pam_ws_router,         prefix="/api")
 
+<<<<<<< HEAD
+=======
+# ── APScheduler ──────────────────────────────────────────────────────
+# scheduler is now imported from core.scheduler_manager
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
 def _daily_db_maintenance():
     """Clean expired sessions; PostgreSQL autovacuum handles storage maintenance."""
@@ -808,7 +1028,10 @@ async def stable_http_exception_handler(request: Request, exc: StarletteHTTPExce
         return response
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 class SPAStaticFiles(StaticFiles):
     """
     Custom StaticFiles to support Single Page Application (SPA) routing.
@@ -844,12 +1067,19 @@ if os.path.exists("dist"):
 else:
     logger.warning("dist directory not found. Frontend will not be served.")
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 def seed_data():
     from ai.prompts.manager import prompt_manager
     from services.tag_service import seed_builtin_tags, sync_all_device_status_tags
     conn = get_db_connection()
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     try:
         # Keep the tag catalog available for both Device Inventory and
         # Asset Management. The operation is idempotent and only inserts
@@ -860,6 +1090,7 @@ def seed_data():
             logger.info("Synchronized system availability tags for %s device(s)", synced_status_tags)
 
         # Keep the Prompt Center useful on a fresh or upgraded installation.
+<<<<<<< HEAD
         prompt_manager.seed_initial_prompts()
         logger.info("Prompt Center seed templates checked/completed.")
 
@@ -885,6 +1116,41 @@ def seed_data():
              'no router ospf {{ ospf_process_id | default(1) }}'),
             ('VLAN Creation', 'cli', 'switching', 'Cisco',
              'vlan {{ vlan_id | default(10) }}\n name {{ vlan_name | default("Users") }}',
+=======
+        # The manager is idempotent and only inserts the reviewed system
+        # templates that are missing, so existing tenant-authored prompts are
+        # never overwritten.
+        prompt_manager.seed_initial_prompts()
+        logger.info("Prompt Center seed templates checked/completed.")
+
+        # Check if devices table is empty
+        # Mock device seeding removed per user request
+        
+        # Initial administrator provisioning is owned by database bootstrap.
+        # Never recreate a known-password account during application seeding.
+        
+        # Check if templates table is empty (we will sync all templates instead of skipping when count != 0)
+        import uuid
+        from datetime import datetime
+        now = datetime.now().isoformat()
+        
+        templates_seed = [
+            # Cisco
+            ('Basic SSH Setup', 'cli', 'security', 'Cisco', 
+             'ip domain-name {{ domain_name | default("local.net") }}\ncrypto key generate rsa modulus {{ key_size | default(2048) }}\nip ssh version 2\nline vty 0 4\n transport input ssh\n login local', 
+             'no ip domain-name {{ domain_name | default("local.net") }}\ncrypto key zeroize rsa\nline vty 0 4\n transport input all\n no login local'),
+            ('Standard ACL', 'cli', 'security', 'Cisco', 
+             'access-list {{ acl_number | default(10) }} permit {{ source_network | default("192.168.1.0") }} {{ wildcard_mask | default("0.0.0.255") }}\naccess-list {{ acl_number | default(10) }} deny any\ninterface {{ interface_name | default("GigabitEthernet0/1") }}\n ip access-group {{ acl_number | default(10) }} in', 
+             'interface {{ interface_name | default("GigabitEthernet0/1") }}\n no ip access-group {{ acl_number | default(10) }} in\nno access-list {{ acl_number | default(10) }}'),
+            ('BGP Configuration', 'cli', 'routing', 'Cisco', 
+             'router bgp {{ local_as | default(65000) }}\n bgp router-id {{ router_id | default("10.0.0.1") }}\n{% if group_name is defined and group_name %}\n neighbor {{ group_name }} peer-group\n neighbor {{ group_name }} remote-as {{ peer_as | default(65001) }}\n neighbor {{ peer_ip | default("10.0.0.2") }} peer-group {{ group_name }}\n{% else %}\n neighbor {{ peer_ip | default("10.0.0.2") }} remote-as {{ peer_as | default(65001) }}\n{% endif %}\n{% if address_family is defined and address_family %}\n address-family {{ address_family }}\n  neighbor {{ peer_ip | default("10.0.0.2") }} activate\n  {% if network_ip is defined and network_ip %}\n  network {{ network_ip }} mask {{ network_mask | default("255.255.255.0") }}\n  {% endif %}\n{% else %}\n  {% if network_ip is defined and network_ip %}\n  network {{ network_ip }} mask {{ network_mask | default("255.255.255.0") }}\n  {% endif %}\n{% endif %}', 
+             'no router bgp {{ local_as | default(65000) }}'),
+            ('OSPF Single Area', 'cli', 'routing', 'Cisco', 
+             'router ospf {{ ospf_process_id | default(1) }}\n router-id {{ router_id | default("10.0.0.1") }}\n network {{ network_ip | default("10.0.0.0") }} {{ wildcard_mask | default("0.0.0.255") }} area {{ area_id | default(0) }}', 
+             'no router ospf {{ ospf_process_id | default(1) }}'),
+            ('VLAN Creation', 'cli', 'switching', 'Cisco', 
+             'vlan {{ vlan_id | default(10) }}\n name {{ vlan_name | default("Users") }}', 
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
              'no vlan {{ vlan_id | default(10) }}'),
             ('Static Route', 'cli', 'routing', 'Cisco',
              'ip route {{ destination_network | default("192.168.2.0") }} {{ netmask | default("255.255.255.0") }} {{ next_hop_ip | default("10.0.0.2") }}',
@@ -900,6 +1166,7 @@ def seed_data():
              'no ntp server {{ ntp_server_ip | default("10.0.0.254") }}'),
 
             # Juniper
+<<<<<<< HEAD
             ('Basic SSH Setup', 'cli', 'security', 'Juniper',
              'set system services ssh root-login {{ root_login | default("deny") }}\nset system services ssh protocol-version v2',
              'delete system services ssh'),
@@ -914,6 +1181,22 @@ def seed_data():
              'delete protocols ospf area {{ area_id | default("0.0.0.0") }} interface {{ interface_name | default("ge-0/0/0.0") }}'),
             ('VLAN Creation', 'cli', 'switching', 'Juniper',
              'set vlans {{ vlan_name | default("USERS") }} vlan-id {{ vlan_id | default(10) }}',
+=======
+            ('Basic SSH Setup', 'cli', 'security', 'Juniper', 
+             'set system services ssh root-login {{ root_login | default("deny") }}\nset system services ssh protocol-version v2', 
+             'delete system services ssh'),
+            ('Firewall Filter (ACL)', 'cli', 'security', 'Juniper', 
+             'set firewall family inet filter {{ filter_name | default("PROTECT") }} term 1 from source-address {{ source_network | default("192.168.1.0/24") }}\nset firewall family inet filter {{ filter_name | default("PROTECT") }} term 1 then accept\nset firewall family inet filter {{ filter_name | default("PROTECT") }} term 2 then reject', 
+             'delete firewall family inet filter {{ filter_name | default("PROTECT") }}'),
+            ('BGP Configuration', 'cli', 'routing', 'Juniper', 
+             'set routing-options autonomous-system {{ local_as | default(65000) }}\nset protocols bgp group {{ group_name | default("EXTERNAL") }} type external\nset protocols bgp group {{ group_name | default("EXTERNAL") }} peer-as {{ peer_as | default(65001) }}\nset protocols bgp group {{ group_name | default("EXTERNAL") }} neighbor {{ peer_ip | default("10.0.0.2") }}', 
+             'delete protocols bgp group {{ group_name | default("EXTERNAL") }}\ndelete routing-options autonomous-system {{ local_as | default(65000) }}'),
+            ('OSPF Single Area', 'cli', 'routing', 'Juniper', 
+             'set protocols ospf area {{ area_id | default("0.0.0.0") }} interface {{ interface_name | default("ge-0/0/0.0") }}', 
+             'delete protocols ospf area {{ area_id | default("0.0.0.0") }} interface {{ interface_name | default("ge-0/0/0.0") }}'),
+            ('VLAN Creation', 'cli', 'switching', 'Juniper', 
+             'set vlans {{ vlan_name | default("USERS") }} vlan-id {{ vlan_id | default(10) }}', 
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
              'delete vlans {{ vlan_name | default("USERS") }}'),
             ('Static Route', 'cli', 'routing', 'Juniper',
              'set routing-options static route {{ destination_network | default("192.168.2.0/24") }} next-hop {{ next_hop_ip | default("10.0.0.2") }}',
@@ -926,15 +1209,24 @@ def seed_data():
              'delete snmp community {{ snmp_community | default("public") }}'),
 
             # Huawei
+<<<<<<< HEAD
             ('Basic SSH Setup', 'cli', 'security', 'Huawei',
              'rsa local-key-pair create {{ key_size | default(2048) }}\nuser-interface vty 0 4\n authentication-mode aaa\n protocol inbound ssh',
              'rsa local-key-pair destroy'),
             ('Basic ACL', 'cli', 'security', 'Huawei',
              'acl number {{ acl_number | default(2000) }}\n rule 5 permit source {{ source_network | default("192.168.1.0") }} {{ wildcard_mask | default("0.0.0.255") }}\n rule 10 deny',
+=======
+            ('Basic SSH Setup', 'cli', 'security', 'Huawei', 
+             'rsa local-key-pair create {{ key_size | default(2048) }}\nuser-interface vty 0 4\n authentication-mode aaa\n protocol inbound ssh', 
+             'rsa local-key-pair destroy'),
+            ('Basic ACL', 'cli', 'security', 'Huawei', 
+             'acl number {{ acl_number | default(2000) }}\n rule 5 permit source {{ source_network | default("192.168.1.0") }} {{ wildcard_mask | default("0.0.0.255") }}\n rule 10 deny', 
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
              'undo acl {{ acl_number | default(2000) }}'),
             ('Advanced ACL', 'cli', 'security', 'Huawei',
              'acl number {{ acl_number | default(3000) }}\n rule 5 permit ip source {{ source_network | default("192.168.1.0") }} {{ wildcard_mask | default("0.0.0.255") }} destination {{ destination_network | default("10.0.0.0") }} {{ dest_wildcard_mask | default("0.0.0.255") }}\n rule 10 deny ip',
              'undo acl {{ acl_number | default(3000) }}'),
+<<<<<<< HEAD
             ('BGP Configuration', 'cli', 'routing', 'Huawei',
              'bgp {{ local_as | default(65000) }}\n router-id {{ router_id | default("10.0.0.1") }}\n peer {{ peer_ip | default("10.0.0.2") }} as-number {{ peer_as | default(65001) }}\n ipv4-family unicast\n  peer {{ peer_ip | default("10.0.0.2") }} enable\n  network {{ network_ip | default("192.168.1.0") }} {{ network_mask | default("255.255.255.0") }}',
              'undo bgp {{ local_as | default(65000) }}'),
@@ -942,6 +1234,15 @@ def seed_data():
              'ospf {{ ospf_process_id | default(1) }} router-id {{ router_id | default("10.0.0.1") }}\n area {{ area_id | default("0.0.0.0") }}\n  network {{ network_ip | default("10.0.0.0") }} {{ wildcard_mask | default("0.0.0.255") }}',
              'undo ospf {{ ospf_process_id | default(1) }}'),
             ('VLAN Creation', 'cli', 'switching', 'Huawei',
+=======
+            ('BGP Configuration', 'cli', 'routing', 'Huawei', 
+             'bgp {{ local_as | default(65000) }}\n router-id {{ router_id | default("10.0.0.1") }}\n peer {{ peer_ip | default("10.0.0.2") }} as-number {{ peer_as | default(65001) }}\n ipv4-family unicast\n  peer {{ peer_ip | default("10.0.0.2") }} enable\n  network {{ network_ip | default("192.168.1.0") }} {{ network_mask | default("255.255.255.0") }}', 
+             'undo bgp {{ local_as | default(65000) }}'),
+            ('OSPF Single Area', 'cli', 'routing', 'Huawei', 
+             'ospf {{ ospf_process_id | default(1) }} router-id {{ router_id | default("10.0.0.1") }}\n area {{ area_id | default("0.0.0.0") }}\n  network {{ network_ip | default("10.0.0.0") }} {{ wildcard_mask | default("0.0.0.255") }}', 
+             'undo ospf {{ ospf_process_id | default(1) }}'),
+            ('VLAN Creation', 'cli', 'switching', 'Huawei', 
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
              'vlan {{ vlan_id | default(10) }}\n description {{ vlan_name | default("USERS") }}',
              'undo vlan {{ vlan_id | default(10) }}'),
             ('Static Route', 'cli', 'routing', 'Huawei',
@@ -958,6 +1259,7 @@ def seed_data():
              'undo ntp-service unicast-server {{ ntp_server_ip | default("10.0.0.254") }}'),
 
             # Arista
+<<<<<<< HEAD
             ('Basic SSH Setup', 'cli', 'security', 'Arista',
              'management ssh\n server-port {{ ssh_port | default(22) }}\n no shutdown',
              'management ssh\n shutdown'),
@@ -972,6 +1274,22 @@ def seed_data():
              'no router ospf {{ ospf_process_id | default(1) }}'),
             ('VLAN Creation', 'cli', 'switching', 'Arista',
              'vlan {{ vlan_id | default(10) }}\n name {{ vlan_name | default("Users") }}',
+=======
+            ('Basic SSH Setup', 'cli', 'security', 'Arista', 
+             'management ssh\n server-port {{ ssh_port | default(22) }}\n no shutdown', 
+             'management ssh\n shutdown'),
+            ('Standard ACL', 'cli', 'security', 'Arista', 
+             'ip access-list standard {{ acl_name | default("PROTECT") }}\n permit {{ source_network | default("192.168.1.0/24") }}\n deny any', 
+             'no ip access-list standard {{ acl_name | default("PROTECT") }}'),
+            ('BGP Configuration', 'cli', 'routing', 'Arista', 
+             'router bgp {{ local_as | default(65000) }}\n router-id {{ router_id | default("10.0.0.1") }}\n neighbor {{ peer_ip | default("10.0.0.2") }} remote-as {{ peer_as | default(65001) }}\n network {{ network_ip | default("192.168.1.0/24") }}', 
+             'no router bgp {{ local_as | default(65000) }}'),
+            ('OSPF Single Area', 'cli', 'routing', 'Arista', 
+             'router ospf {{ ospf_process_id | default(1) }}\n router-id {{ router_id | default("10.0.0.1") }}\n network {{ network_ip | default("10.0.0.0/24") }} area {{ area_id | default("0.0.0.0") }}', 
+             'no router ospf {{ ospf_process_id | default(1) }}'),
+            ('VLAN Creation', 'cli', 'switching', 'Arista', 
+             'vlan {{ vlan_id | default(10) }}\n name {{ vlan_name | default("Users") }}', 
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
              'no vlan {{ vlan_id | default(10) }}'),
             ('Static Route', 'cli', 'routing', 'Arista',
              'ip route {{ destination_network | default("192.168.2.0/24") }} {{ next_hop_ip | default("10.0.0.2") }}',
@@ -981,11 +1299,19 @@ def seed_data():
              'no snmp-server community {{ snmp_community | default("public") }}'),
 
             # H3C
+<<<<<<< HEAD
             ('Basic SSH Setup', 'cli', 'security', 'H3C',
              'public-key local create rsa\nuser-interface vty 0 4\n authentication-mode scheme\n protocol inbound ssh',
              'public-key local destroy rsa'),
             ('Basic ACL', 'cli', 'security', 'H3C',
              'acl basic {{ acl_number | default(2000) }}\n rule 5 permit source {{ source_network | default("192.168.1.0") }} {{ wildcard_mask | default("0.0.0.255") }}\n rule 10 deny',
+=======
+            ('Basic SSH Setup', 'cli', 'security', 'H3C', 
+             'public-key local create rsa\nuser-interface vty 0 4\n authentication-mode scheme\n protocol inbound ssh', 
+             'public-key local destroy rsa'),
+            ('Basic ACL', 'cli', 'security', 'H3C', 
+             'acl basic {{ acl_number | default(2000) }}\n rule 5 permit source {{ source_network | default("192.168.1.0") }} {{ wildcard_mask | default("0.0.0.255") }}\n rule 10 deny', 
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
              'undo acl basic {{ acl_number | default(2000) }}'),
             ('Advanced ACL', 'cli', 'security', 'H3C',
              'acl advanced {{ acl_number | default(3000) }}\n rule 5 permit ip source {{ source_network | default("192.168.1.0") }} {{ wildcard_mask | default("0.0.0.255") }} destination {{ destination_network | default("10.0.0.0") }} {{ dest_wildcard_mask | default("0.0.0.255") }}\n rule 10 deny ip',
@@ -1003,7 +1329,11 @@ def seed_data():
              'snmp-agent community read {{ snmp_community | default("public") }} acl {{ acl_number | default(2000) }}\nsnmp-agent sys-info contact {{ contact_info | default("admin@local.net") }}',
              'undo snmp-agent community read {{ snmp_community | default("public") }}')
         ]
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
         for name, type_, category, vendor, content, rollback in templates_seed:
             row = conn.execute('SELECT id FROM templates WHERE name = ? AND vendor = ?', (name, vendor)).fetchone()
             if row:
@@ -1019,6 +1349,10 @@ def seed_data():
             from datetime import datetime, timezone
             now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
             device_types = [
+<<<<<<< HEAD
+=======
+                # id, model, vendor, u_height, device_role, is_full_depth, description, created_at, updated_at
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
                 (str(uuid.uuid4()), 'Catalyst 9300',     'Cisco',   1, 'switch',   1, '48-port L3 access switch', now, now),
                 (str(uuid.uuid4()), 'Catalyst 9500',     'Cisco',   1, 'switch',   1, '32-port 100G core switch', now, now),
                 (str(uuid.uuid4()), 'Nexus 9332C',       'Cisco',   1, 'switch',   1, '32x100G spine switch', now, now),
@@ -1042,6 +1376,12 @@ def seed_data():
                 device_types
             )
 
+<<<<<<< HEAD
+=======
+        # Seed demo racks if empty (mock seeding removed per user request)
+        pass
+
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
         # Migrate Aliyun DNS and Tencent DNS default targets to DNS_RESOLVE
         conn.execute(
             """
@@ -1055,7 +1395,10 @@ def seed_data():
     finally:
         conn.close()
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 if __name__ == "__main__":
     import uvicorn
     import os
@@ -1065,9 +1408,20 @@ if __name__ == "__main__":
     is_dev = os.environ.get("NODE_ENV") == "development"
     reload_kwargs = {'reload': True} if is_dev else {}
 
+<<<<<<< HEAD
+=======
+    # Bind to loopback by default — production deployments should sit
+    # behind Nginx (which forwards 127.0.0.1:$PORT). Override with
+    # `HOST=0.0.0.0` only when the backend really must accept external
+    # traffic directly (e.g. running outside a reverse proxy).
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     host = os.environ.get("HOST", "127.0.0.1")
 
     if workers > 1:
         uvicorn.run("main:app", host=host, port=port, workers=workers, loop="auto", access_log=False)
     else:
         uvicorn.run("main:app", host=host, port=port, loop="auto", access_log=False, **reload_kwargs)
+<<<<<<< HEAD
+=======
+
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953

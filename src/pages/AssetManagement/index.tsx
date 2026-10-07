@@ -18,7 +18,11 @@ import Pagination from '../../components/Pagination';
 import { DataTable, DataTableFrame } from '../../components/DataTable';
 import PageHero from '../../components/PageHero';
 import TagFilterDropdown from '../../components/TagFilterDropdown';
+<<<<<<< HEAD
 import { ApiError, apiRequest, authHeaders } from '../../api/http';
+=======
+import { apiRequest, authHeaders } from '../../api/http';
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 import { useSystem } from '../../hooks/useSystem';
 import { formatTerminalAgentError, getLocalTerminalConfig, TERMINAL_APP_LABELS } from '../../utils/localTerminal';
 import type { TagDefinition } from '../../types';
@@ -88,6 +92,7 @@ type BatchTakeoverResult = {
 
 type AssetColumnKey = AssetExportColumnKey;
 
+<<<<<<< HEAD
 type AssetLoadIssue = {
   status: number | null;
   message: string;
@@ -122,6 +127,8 @@ const getAssetSaveErrorMessage = (error: unknown, language: string, secretValues
   return zh ? '网络错误，资产未保存。请检查连接后重试。' : 'Network error. The asset was not saved. Check your connection and retry.';
 };
 
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 type AssetColumnDefinition = {
   key: AssetColumnKey;
   zh: string;
@@ -232,15 +239,21 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
   const [assets, setAssets]             = useState<Asset[]>([]);
   const [sites, setSites]               = useState<Array<{ id: string; site_name: string; site_code: string }>>([]);
   const [summary, setSummary]           = useState<AssetSummary | null>(null);
+<<<<<<< HEAD
   const [summaryError, setSummaryError] = useState<AssetLoadIssue | null>(null);
   const [sitesError, setSitesError] = useState<AssetLoadIssue | null>(null);
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
   const [total, setTotal]               = useState(0);
   const [page, setPage]                 = useState(1);
   const [pageSize, setPageSize]         = useState(20);
   const [loading, setLoading]           = useState(true);
+<<<<<<< HEAD
   const [assetError, setAssetError] = useState<AssetLoadIssue | null>(null);
   const [assetsLastLoadedAt, setAssetsLastLoadedAt] = useState<Date | null>(null);
   const assetFetchSequenceRef = React.useRef(0);
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
   const [search, setSearch]             = useState('');
   const [typeFilter, setTypeFilter]     = useState('all');
@@ -302,7 +315,10 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [form, setForm]                 = useState({ ...EMPTY_FORM });
   const [saving, setSaving]             = useState(false);
+<<<<<<< HEAD
   const saveInFlightRef = React.useRef(false);
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
   const [deleteTarget, setDeleteTarget] = useState<Asset | null>(null);
   const [deleteError, setDeleteError]   = useState<string | null>(null);
   const [showProductionConfirm, setShowProductionConfirm] = useState(false);
@@ -324,6 +340,7 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
   const [allTags, setAllTags] = useState<TagDefinition[]>([]);
   const fetchAllRacks = useCallback(async () => {
     try {
+<<<<<<< HEAD
       const data = await apiRequest<{ success?: boolean; data?: unknown }>('/api/racks');
       if (data.success && Array.isArray(data.data)) setAllRacks(data.data);
       else throw new Error('Invalid rack lookup response');
@@ -331,12 +348,27 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
       setFeedbackMsg({ type: 'error', text: getAssetLoadIssue(error, language, zh ? '机柜选项' : 'Rack options').message });
     }
   }, [language, zh]);
+=======
+      const token = localStorage.getItem('netops_token');
+      const res = await fetch('/api/racks', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      if (res.ok && data.success && Array.isArray(data.data)) {
+        setAllRacks(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load racks in AssetManagement:', err);
+    }
+  }, []);
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
   useEffect(() => {
     fetchAllRacks();
   }, [fetchAllRacks]);
 
   useEffect(() => {
+<<<<<<< HEAD
     apiRequest<{ data?: unknown }>('/api/tags/definitions')
       .then(payload => {
         if (!Array.isArray(payload?.data)) throw new Error('Invalid tag lookup response');
@@ -344,6 +376,14 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
       })
       .catch(error => setFeedbackMsg({ type: 'error', text: getAssetLoadIssue(error, language, zh ? '标签选项' : 'Tag options').message }));
   }, [language, zh]);
+=======
+    const token = localStorage.getItem('netops_token');
+    fetch('/api/tags/definitions', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(payload => setAllTags(Array.isArray(payload?.data) ? payload.data : []))
+      .catch(() => setAllTags([]));
+  }, []);
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
   useEffect(() => () => {
     if (rotationPollRef.current) clearInterval(rotationPollRef.current);
@@ -351,6 +391,7 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
   }, []);
 
   const fetchSummary = useCallback(async () => {
+<<<<<<< HEAD
     try {
       const payload = await apiRequest<AssetSummary>('/api/assets/summary');
       setSummary(payload);
@@ -370,6 +411,23 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
       setSitesError(getAssetLoadIssue(error, language, zh ? '站点选项' : 'site options'));
     }
   }, [language, zh]);
+=======
+    try { const r = await fetch('/api/assets/summary', { headers: authHeaders() }); if (r.ok) setSummary(await r.json()); } catch { /* noop */ }
+  }, []);
+
+  const fetchSites = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('netops_token');
+      const response = await fetch('/api/cmdb/sites', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const payload = await response.json();
+      setSites(Array.isArray(payload?.data) ? payload.data : []);
+    } catch {
+      setSites([]);
+    }
+  }, []);
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
   const buildAssetParams = useCallback((requestedPage: number, requestedPageSize: number) => {
     const params = new URLSearchParams({
@@ -389,6 +447,7 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
   }, [search, typeFilter, statusFilter, vendorFilter, dcFilter, deptFilter, deviceCategoryFilter, lifecycleFilter, tagFilter]);
 
   const fetchAssets = useCallback(async () => {
+<<<<<<< HEAD
     const requestSequence = ++assetFetchSequenceRef.current;
     setLoading(true);
     setAssetError(null);
@@ -408,6 +467,16 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
       if (requestSequence === assetFetchSequenceRef.current) setLoading(false);
     }
   }, [buildAssetParams, language, page, pageSize, zh]);
+=======
+    setLoading(true);
+    try {
+      const params = buildAssetParams(page, pageSize);
+      const r = await fetch(`/api/assets?${params}`, { headers: authHeaders() });
+      if (r.ok) { const d = await r.json(); setAssets(d.items); setTotal(d.total); }
+    } catch { /* noop */ }
+    setLoading(false);
+  }, [buildAssetParams, page, pageSize]);
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
   const exportAssetData = useCallback(async () => {
     const allAssets = await fetchAllAssetPages(async (requestedPage, requestedPageSize) => {
@@ -542,9 +611,13 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
       admin_password: '',
       enable_password: '',
       auth_model: 'dual',
+<<<<<<< HEAD
       // Asset responses expose only a configured flag; never hydrate a secret
       // into an editable field, so an untouched save cannot echo it back.
       snmp_community: '',
+=======
+      snmp_community: (a as any).snmp_community || '',
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
       snmp_port: String((a as any).snmp_port || '161'),
       snmp_credential_id: (a as any).snmp_credential_id || '',
       snmp_community_set: Boolean((a as any).snmp_community_set),
@@ -561,12 +634,16 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
       credential_id: (a as any).credential_id || '',
       admin_credential_id: (a as any).admin_credential_id || '',
       tag_ids: (a.tags || []).filter(tag => tag.category !== 'system_auto').map(tag => tag.id),
+<<<<<<< HEAD
       web_profiles: (a.web_profiles || []).map(profile => ({
         ...profile,
         port: String(profile.port),
         normal_password: '',
         admin_password: '',
       })),
+=======
+      web_profiles: (a.web_profiles || []).map(profile => ({ ...profile, port: String(profile.port) })),
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     });
     setShowModal(true);
   };
@@ -605,10 +682,14 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
   }, [zh, fetchAssets]);
 
   const doSave = async (overrides: Record<string, unknown> = {}) => {
+<<<<<<< HEAD
     if (saveInFlightRef.current) return;
     saveInFlightRef.current = true;
     setSaving(true);
     setModalError(null);
+=======
+    setSaving(true);
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     try {
       const url = editingAsset ? `/api/assets/${editingAsset.id}` : '/api/assets';
       const plannedRaw = String(form.planned_start_u ?? '').trim();
@@ -662,6 +743,7 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
           admin_credential_id: String(profile.admin_credential_id || '').trim(),
         })),
       };
+<<<<<<< HEAD
       const data = await apiRequest<any>(url, {
         method: editingAsset ? 'PUT' : 'POST',
         body: JSON.stringify(payload),
@@ -696,6 +778,37 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
       saveInFlightRef.current = false;
       setSaving(false);
     }
+=======
+      const r = await fetch(url, { method: editingAsset ? 'PUT' : 'POST', headers: authHeaders(true), body: JSON.stringify(payload) });
+      if (r.ok) {
+        const data = await r.json().catch(() => null);
+        setShowModal(false);
+        setShowProductionConfirm(false);
+        fetchAssets();
+        fetchSummary();
+        if (data?.rotation_pending && editingAsset) {
+          startRotationPoll(editingAsset.id);
+        } else if (data?.legacy_exempt) {
+          setFeedbackMsg({ type: 'success', text: zh ? '存量设备已免上收投产，可使用普通账号执行只读任务。' : 'Legacy device marked as production without takeover; read-only tasks remain available.' });
+        } else if (data?.password_rotated) {
+          setFeedbackMsg({ type: 'success', text: zh ? '已投产，默认口令已自动修改上收。' : 'Marked as production. Default password has been auto-rotated.' });
+        } else if (data?.lifecycle_reverted && data?.rotation_detail) {
+          setFeedbackMsg({ type: 'warning', text: zh ? `口令自动轮换失败，投产已回滚: ${data.rotation_detail}` : `Auto-rotation failed, production transition reverted: ${data.rotation_detail}` });
+          fetchAssets();
+        } else if (data?.rotation_detail) {
+          setFeedbackMsg({ type: 'warning', text: zh ? `已投产，但口令自动轮换失败: ${data.rotation_detail}` : `Marked as production, but auto-rotation failed: ${data.rotation_detail}` });
+        }
+      } else if (r.status === 422 || r.status === 400) {
+        const err = await r.json().catch(() => null);
+        setShowProductionConfirm(false);
+        setModalError(zh ? (err?.detail || '保存校验失败') : (err?.detail || 'Validation failed'));
+      } else {
+        const err = await r.json().catch(() => null);
+        setFeedbackMsg({ type: 'error', text: zh ? `保存失败: ${err?.detail || r.statusText}` : `Save failed: ${err?.detail || r.statusText}` });
+      }
+    } catch (e) { setFeedbackMsg({ type: 'error', text: zh ? `网络错误: ${e}` : `Network error: ${e}` }); }
+    setSaving(false);
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
   };
 
   const handleSave = async () => {
@@ -1729,6 +1842,7 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
       <div className="flex-1 overflow-auto p-5 space-y-4">
         <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImport} />
 
+<<<<<<< HEAD
         {summaryError && (
           <div role="alert" className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-xs ${summaryError.permissionDenied ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>
             <span>{summaryError.message}</span>
@@ -1742,6 +1856,8 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
           </div>
         )}
 
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
         <AnimatePresence>
           {feedbackMsg && (
             <motion.div
@@ -1831,7 +1947,11 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
           {([
             {
               key: 'all',
+<<<<<<< HEAD
               value: summary ? totalCount : '—',
+=======
+              value: totalCount,
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
               label: zh ? '全部资产' : 'All Assets',
               sub: zh ? '全部' : 'ALL',
               Icon: Package,
@@ -1842,7 +1962,11 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
             },
             {
               key: 'critical',
+<<<<<<< HEAD
               value: summary ? criticalCount : '—',
+=======
+              value: criticalCount,
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
               label: zh ? '严重故障' : 'Critical',
               sub: 'P1',
               Icon: Flame,
@@ -1854,7 +1978,11 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
             },
             {
               key: 'major',
+<<<<<<< HEAD
               value: summary ? majorCount : '—',
+=======
+              value: majorCount,
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
               label: zh ? '重要问题' : 'Major Issues',
               sub: 'P2',
               Icon: AlertTriangle,
@@ -1865,7 +1993,11 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
             },
             {
               key: 'warning',
+<<<<<<< HEAD
               value: summary ? warningCount : '—',
+=======
+              value: warningCount,
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
               label: zh ? '需要关注' : 'Warning',
               sub: 'P3',
               Icon: AlertCircle,
@@ -1876,7 +2008,11 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
             },
             {
               key: 'healthy',
+<<<<<<< HEAD
               value: summary ? healthyCount : '—',
+=======
+              value: healthyCount,
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
               label: zh ? '运行正常' : 'Healthy',
               sub: zh ? '正常' : 'OK',
               Icon: CheckCircle2,
@@ -1887,9 +2023,14 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
             },
           ]).map(c => {
             const isActive = severityFilter === c.filterVal;
+<<<<<<< HEAD
             const isEmpty = !summary || c.value === 0;
             const numericValue = typeof c.value === 'number' ? c.value : 0;
             const pct = summary && totalCount > 0 ? Math.round((numericValue / totalCount) * 100) : 0;
+=======
+            const isEmpty = c.value === 0;
+            const pct = totalCount > 0 ? Math.round((c.value / totalCount) * 100) : 0;
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
             return (
               <button
                 key={c.key}
@@ -1935,7 +2076,11 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
                       c.key === 'warning' ? 'bg-amber-500' :
                       'bg-emerald-500'
                     }`}
+<<<<<<< HEAD
                     style={{ width: `${Math.max(numericValue > 0 ? 6 : 0, pct)}%` }}
+=======
+                    style={{ width: `${Math.max(c.value > 0 ? 6 : 0, pct)}%` }}
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
                   />
                 </div>
               </button>
@@ -1945,6 +2090,7 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
 
         {/* Main Table Container */}
         <div className="bg-white dark:bg-zinc-900/90 border border-gray-200/70 dark:border-zinc-800/80 rounded-2xl shadow-2xs overflow-hidden">
+<<<<<<< HEAD
           {assetError && (
             <div role="alert" className={`flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 text-xs ${assetError.permissionDenied ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>
               <div>
@@ -1954,6 +2100,8 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
               <button type="button" onClick={() => { void fetchAssets(); }} className="rounded-lg border border-current/20 px-3 py-1.5 font-semibold hover:bg-black/5">{zh ? '重试' : 'Retry'}</button>
             </div>
           )}
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
           {/* Header Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-gray-100 dark:border-zinc-800 bg-gray-50/50 dark:bg-zinc-800/30">
             <div className="flex items-center gap-2">
@@ -2176,13 +2324,20 @@ const AssetManagementTab: React.FC<AssetManagementTabProps> = ({ language, setAc
                   </tr>
                 </thead>
                 <tbody>
+<<<<<<< HEAD
                   {loading && assets.length === 0 ? (
+=======
+                  {loading ? (
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
                     <tr><td colSpan={DEFAULT_VISIBLE_ASSET_COLUMNS.length + 2} className="text-center py-20 text-gray-400">
                       <RefreshCw size={18} className="mx-auto mb-2 animate-spin text-blue-500" />
                       <p className="text-xs font-medium">{zh ? '加载资产中...' : 'Loading...'}</p>
                     </td></tr>
+<<<<<<< HEAD
                   ) : assetError && displayAssets.length === 0 ? (
                     <tr><td colSpan={DEFAULT_VISIBLE_ASSET_COLUMNS.length + 2} className="py-20 text-center text-sm text-rose-600">{assetError.permissionDenied ? (zh ? '无权查看资产列表。' : 'You do not have permission to view the asset list.') : (zh ? '资产列表加载失败，请使用上方按钮重试。' : 'The asset list could not be loaded. Use the retry button above.')}</td></tr>
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
                   ) : displayAssets.length === 0 ? (
                     <tr><td colSpan={DEFAULT_VISIBLE_ASSET_COLUMNS.length + 2} className="py-20">
                       <div className="text-center max-w-lg mx-auto">

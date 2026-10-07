@@ -1,6 +1,10 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+<<<<<<< HEAD
 import { Terminal, Shield, Lock, Wifi, Network, Building2, AlertCircle, AlertTriangle, Globe2, Plus, Trash2, X, RefreshCw } from 'lucide-react';
+=======
+import { Terminal, Shield, Lock, Wifi, Network, Building2, AlertCircle, AlertTriangle, Globe2, Plus, Trash2, X } from 'lucide-react';
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 import DateTimePicker from '../../../components/DateTimePicker';
 import { PasswordInputField } from '../../../components/ui/PasswordInputField';
 import { Asset } from '../types';
@@ -23,7 +27,11 @@ import {
 import { AssetTagPicker } from './AssetTagPicker';
 import { ActionIconButton } from '../../../components/ui/ActionIconButton';
 import { isReservedSystemSite } from '../../../utils/siteIdentity';
+<<<<<<< HEAD
 import { ApiError, apiRequest, authHeaders } from '../../../api/http';
+=======
+import { authHeaders } from '../../../api/http';
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 import { useEscapeClose } from '../../../hooks/useEscapeClose';
 
 interface AssetModalProps {
@@ -40,8 +48,13 @@ interface AssetModalProps {
   setShowEnableSecret: React.Dispatch<React.SetStateAction<boolean>>;
   showProductionConfirm: boolean;
   setShowProductionConfirm: (val: boolean) => void;
+<<<<<<< HEAD
   handleSave: () => void | Promise<void>;
   doSave: (overrides?: Record<string, unknown>) => void | Promise<void>;
+=======
+  handleSave: () => void;
+  doSave: (overrides?: Record<string, unknown>) => void;
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
   language: string;
   setFeedbackMsg: (msg: any) => void;
   allTags: TagDefinition[];
@@ -72,6 +85,7 @@ export const AssetModal: React.FC<AssetModalProps> = ({
 
   const [racks, setRacks] = React.useState<any[]>([]);
   const [sites, setSites] = React.useState<any[]>([]);
+<<<<<<< HEAD
   const [lookupsLoading, setLookupsLoading] = React.useState(false);
   const [lookupsLoaded, setLookupsLoaded] = React.useState(false);
   const [lookupRetry, setLookupRetry] = React.useState(0);
@@ -81,6 +95,11 @@ export const AssetModal: React.FC<AssetModalProps> = ({
   const [legacyExemptReason, setLegacyExemptReason] = React.useState('');
   const [credentials, setCredentials] = React.useState<any[]>([]);
   const saveLockRef = React.useRef(false);
+=======
+  const [uValidationError, setUValidationError] = React.useState<string | null>(null);
+  const [legacyExemptReason, setLegacyExemptReason] = React.useState('');
+  const [credentials, setCredentials] = React.useState<any[]>([]);
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
   const [credMode, setCredMode] = React.useState<'manual' | 'existing'>('manual');
   const [breakGlassAcknowledged, setBreakGlassAcknowledged] = React.useState(false);
   const mgmtIpError = React.useMemo(() => {
@@ -97,6 +116,7 @@ export const AssetModal: React.FC<AssetModalProps> = ({
   }, [isOpen, form.credential_id]);
 
   React.useEffect(() => {
+<<<<<<< HEAD
     if (!isOpen) return;
     const controller = new AbortController();
     let active = true;
@@ -160,6 +180,30 @@ export const AssetModal: React.FC<AssetModalProps> = ({
       controller.abort();
     };
   }, [isOpen, lookupRetry, zh]);
+=======
+    if (isOpen) {
+      const token = localStorage.getItem('netops_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      Promise.all([
+        fetch('/api/racks', { headers }).then(res => res.json()),
+        fetch('/api/cmdb/sites', { headers }).then(res => res.json()),
+        fetch('/api/credentials', { headers }).then(res => res.json()),
+      ])
+      .then(([rackData, siteData, credData]) => {
+        if (rackData && rackData.success && Array.isArray(rackData.data)) {
+          setRacks(rackData.data);
+        }
+        if (siteData && siteData.success && Array.isArray(siteData.data)) {
+          setSites(siteData.data);
+        }
+        if (credData && credData.success && Array.isArray(credData.data)) {
+          setCredentials(credData.data);
+        }
+      })
+      .catch(err => console.error('Failed to load asset location data:', err));
+    }
+  }, [isOpen]);
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
   const filteredRacks = React.useMemo(() => {
     if (!form.site_id) {
@@ -191,6 +235,7 @@ export const AssetModal: React.FC<AssetModalProps> = ({
   );
   const selectedSnmpCredential = snmpCredentials.find(c => c.id === form.snmp_credential_id);
   const snmpCommunityConfigured = Boolean(form.snmp_community_set || selectedSnmpCredential?.has_snmp_community);
+<<<<<<< HEAD
   const showLookupLoading = isOpen && (lookupsLoading || (!lookupsLoaded && !lookupError));
   const runSaveAction = React.useCallback(async (action: () => void | Promise<void>) => {
     if (saving || saveLockRef.current) return;
@@ -205,6 +250,8 @@ export const AssetModal: React.FC<AssetModalProps> = ({
   const doSaveOnce = React.useCallback((overrides?: Record<string, unknown>) => {
     void runSaveAction(() => doSave(overrides));
   }, [doSave, runSaveAction]);
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
   const withTechnologyTag = (next: any, vendor: string, platform: string) => {
     let targetPlatform = platform;
@@ -253,6 +300,7 @@ export const AssetModal: React.FC<AssetModalProps> = ({
       return;
     }
 
+<<<<<<< HEAD
     const controller = new AbortController();
     const validate = async () => {
       try {
@@ -278,6 +326,30 @@ export const AssetModal: React.FC<AssetModalProps> = ({
       controller.abort();
     };
   }, [form.rack, form.planned_start_u, form.u_height, editingAsset, language]);
+=======
+    const validate = async () => {
+      try {
+        const token = localStorage.getItem('netops_token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const url = `/api/racks/validate-u?rack=${encodeURIComponent(rack)}&start_u=${startU}&u_height=${height}&exclude_asset_id=${editingAsset?.id || ''}`;
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.success) {
+            setUValidationError(data.reason);
+          } else {
+            setUValidationError(null);
+          }
+        }
+      } catch (err) {
+        console.error("U validation failed", err);
+      }
+    };
+
+    const timer = setTimeout(validate, 300);
+    return () => clearTimeout(timer);
+  }, [form.rack, form.planned_start_u, form.u_height, editingAsset]);
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
   if (!isOpen) return null;
 
@@ -312,6 +384,7 @@ export const AssetModal: React.FC<AssetModalProps> = ({
             <div className="rounded-lg border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-[10px] text-cyan-800">
               {zh ? '必填规则：主机名、资产编号至少填写一项。存量设备直接投产时，还必须填写普通账号、普通密码和免上收投产原因（至少 5 个字符）。' : 'Required: provide either Hostname or Asset Tag. Legacy devices created as production also require a normal username, normal password, and an exemption reason (minimum 5 characters).'}
             </div>
+<<<<<<< HEAD
             {showLookupLoading && (
               <div role="status" className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] text-slate-600">
                 <RefreshCw size={12} className="animate-spin" />
@@ -329,6 +402,8 @@ export const AssetModal: React.FC<AssetModalProps> = ({
                 {zh ? `没有可用的${lookupEmptyResources.join('、')}选项。` : `No ${lookupEmptyResources.join(', ')} options are available.`}
               </div>
             )}
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
             {/* ─── 基本属性 ─── */}
             <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
               <div>
@@ -821,7 +896,11 @@ export const AssetModal: React.FC<AssetModalProps> = ({
                   </div>
                 )}
 
+<<<<<<< HEAD
                 <AssetTagPicker tags={allTags} selectedIds={form.tag_ids || []} onChange={ids => setForm(f => ({ ...f, tag_ids: ids }))} onSave={handleSaveOnce} language={language} assetType={form.asset_type} />
+=======
+                <AssetTagPicker tags={allTags} selectedIds={form.tag_ids || []} onChange={ids => setForm(f => ({ ...f, tag_ids: ids }))} onSave={handleSave} language={language} assetType={form.asset_type} />
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
                 {/* PAM Toggle */}
                 <div className="flex items-center justify-between p-2.5 rounded-xl bg-cyan-50 border border-cyan-200/60 mt-1">
@@ -1170,7 +1249,11 @@ export const AssetModal: React.FC<AssetModalProps> = ({
             <div className="flex justify-end gap-2">
               <button onClick={onClose} className="px-3 py-1.5 rounded-lg bg-black/[0.01] border border-black/5 text-black/40 text-xs hover:bg-black/[0.02]">{zh ? '取消' : 'Cancel'}</button>
               <button
+<<<<<<< HEAD
                 onClick={handleSaveOnce}
+=======
+                onClick={handleSave}
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
                 disabled={saving || (!form.hostname.trim() && !form.asset_tag.trim()) || !!uValidationError || (!isEditMode && form.asset_origin === 'legacy' && form.lifecycle_status === 'production' && String(form.takeover_exempt_reason || '').trim().length < 5) || (form.ssh_algorithm_profile === 'legacy_break_glass' && !breakGlassAcknowledged)}
                 className="px-4 py-1.5 rounded-lg bg-[#00bceb] text-white text-xs font-bold hover:bg-[#00a5d0] disabled:opacity-50 shadow-sm shadow-[#00bceb]/20"
               >
@@ -1213,7 +1296,11 @@ export const AssetModal: React.FC<AssetModalProps> = ({
                     {zh ? '取消' : 'Cancel'}
                   </button>
                   <button
+<<<<<<< HEAD
                     onClick={() => { setShowProductionConfirm(false); doSaveOnce({ production_mode: 'takeover' }); }}
+=======
+                    onClick={() => { setShowProductionConfirm(false); doSave({ production_mode: 'takeover' }); }}
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
                     disabled={saving}
                     className="flex-1 px-3 py-1.5 rounded-lg bg-[#00bceb] text-white text-xs font-bold hover:bg-[#00a5d0] disabled:opacity-50"
                   >
@@ -1223,7 +1310,11 @@ export const AssetModal: React.FC<AssetModalProps> = ({
                 <button
                   onClick={() => {
                     setShowProductionConfirm(false);
+<<<<<<< HEAD
                     doSaveOnce({ production_mode: 'legacy_exempt', takeover_exempt_reason: legacyExemptReason.trim() });
+=======
+                    doSave({ production_mode: 'legacy_exempt', takeover_exempt_reason: legacyExemptReason.trim() });
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
                   }}
                   disabled={saving || editingAsset?.asset_origin !== 'legacy' || legacyExemptReason.trim().length < 5}
                   className="mt-2 w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"

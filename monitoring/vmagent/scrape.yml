@@ -1,6 +1,11 @@
 global:
+<<<<<<< HEAD
   scrape_interval: 300s
   scrape_timeout: 120s
+=======
+  scrape_interval: 60s
+  scrape_timeout: 30s
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
 scrape_configs:
   - job_name: network_snmp

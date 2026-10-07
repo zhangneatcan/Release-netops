@@ -7,7 +7,10 @@ import json
 from itertools import islice
 import math
 import re
+<<<<<<< HEAD
 import time
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping, Sequence
@@ -870,6 +873,7 @@ def list_hardware_sensors(
     return result
 
 
+<<<<<<< HEAD
 def list_hardware_metric_rows(
     conn,
     *,
@@ -886,6 +890,13 @@ def list_hardware_metric_rows(
                s.rule_version, s.discovery_status, s.lifecycle_status, s.enabled,
                s.unit, s.last_value, s.last_raw_value, s.last_quality, s.last_success,
                d.hostname, d.platform, d.vendor, d.role,
+=======
+def list_hardware_metric_rows(conn) -> list[dict[str, Any]]:
+    """Load active sensors with safe device labels for the internal metrics API."""
+    rows = conn.execute(
+        """
+        SELECT s.*, d.hostname, d.platform, d.vendor, d.role,
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
                d.tenant_id AS device_tenant_id, d.asset_id AS device_asset_id,
                COALESCE(NULLIF(si.site_name, ''), NULLIF(si.site_code, ''), NULLIF(d.site, ''), '') AS site_name
           FROM snmp_hardware_sensors s
@@ -896,16 +907,25 @@ def list_hardware_metric_rows(
          ORDER BY s.device_id, s.component_class, s.sensor_key
         """
     ).fetchall()
+<<<<<<< HEAD
     if timings is not None:
         timings["sensor_query_ms"] = (time.perf_counter() - query_started) * 1000
 
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     json_fields = {
         "index_json": ("index", []),
         "index_labels_json": ("index_labels", {}),
         "states_json": ("states", {}),
+<<<<<<< HEAD
         "metadata_json": ("metadata", {}),
     }
     decode_started = time.perf_counter() if timings is not None else 0.0
+=======
+        "thresholds_json": ("thresholds", {}),
+        "metadata_json": ("metadata", {}),
+    }
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     result: list[dict[str, Any]] = []
     for row in rows:
         item = dict(row)
@@ -915,8 +935,11 @@ def list_hardware_metric_rows(
         item["tenant_id"] = item.pop("tenant_id", None) or item.pop("device_tenant_id", None)
         item["asset_id"] = item.pop("asset_id", None) or item.pop("device_asset_id", None) or item.get("device_id")
         result.append(item)
+<<<<<<< HEAD
     if timings is not None:
         timings["sensor_decode_ms"] = (time.perf_counter() - decode_started) * 1000
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     return result
 
 

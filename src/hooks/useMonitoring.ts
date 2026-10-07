@@ -1,6 +1,12 @@
+<<<<<<< HEAD
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMonitoringStore } from '../store/monitoringStore';
 import { apiRequest, authHeaders } from '../api/http';
+=======
+import { useCallback, useEffect, useRef } from 'react';
+import { useMonitoringStore } from '../store/monitoringStore';
+import { authHeaders } from '../api/http';
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 import type { OutboundTarget } from '../types/outbound';
 import type { DeviceHealthHistoryResponse, MonitoringHealthDevicesResponse, MonitoringIncident, MonitoringIncidentImpact, MonitoringIncidentListResponse, MonitoringPlaybookRecommendationsResponse } from '../types';
 
@@ -18,7 +24,11 @@ const isAbortError = (error: unknown) => {
   return typeof error === 'object' && (error as { name?: string }).name === 'AbortError';
 };
 
+<<<<<<< HEAD
 export const useMonitoring = ({ isAuthenticated, activeTab, language, pollOutbound = true, healthHistoryRange = 24 }: UseMonitoringProps) => {
+=======
+export const useMonitoring = ({ isAuthenticated, activeTab, pollOutbound = true, healthHistoryRange = 24 }: UseMonitoringProps) => {
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
   const {
     monitorSearch,
     monitorSearchResults,
@@ -97,6 +107,7 @@ export const useMonitoring = ({ isAuthenticated, activeTab, language, pollOutbou
   } = useMonitoringStore();
 
   const monitorRequestEpochRef = useRef(0);
+<<<<<<< HEAD
   const overviewRequestSequenceRef = useRef(0);
   const [monitorOverviewLoading, setMonitorOverviewLoading] = useState(
     isAuthenticated && ['monitoring', 'health'].includes(activeTab),
@@ -141,6 +152,22 @@ export const useMonitoring = ({ isAuthenticated, activeTab, language, pollOutbou
   useEffect(() => () => {
     overviewRequestSequenceRef.current += 1;
   }, []);
+=======
+
+  const fetchMonitoringOverview = useCallback(async (forceRefresh = false, signal?: AbortSignal) => {
+    const reqEpoch = monitorRequestEpochRef.current;
+    try {
+      const suffix = forceRefresh ? '?force_refresh=1' : '';
+      const resp = await fetch(`/api/monitoring/overview${suffix}`, { signal, headers: authHeaders() });
+      if (!resp.ok) return;
+      const payload = await resp.json();
+      if (reqEpoch !== monitorRequestEpochRef.current) return;
+      setMonitorOverview(payload);
+    } catch (error) {
+      if (isAbortError(error)) return;
+    }
+  }, [setMonitorOverview]);
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
   const fetchHostResources = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -735,9 +762,12 @@ export const useMonitoring = ({ isAuthenticated, activeTab, language, pollOutbou
     outboundHistoryHours,
     setOutboundHistoryHours,
     fetchMonitoringOverview,
+<<<<<<< HEAD
     monitorOverviewLoading,
     monitorOverviewError,
     monitorOverviewUpdatedAt,
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     fetchMonitoringHealthHistory,
     fetchMonitoringCollectionStatus,
     fetchMonitoringHealthDevices,

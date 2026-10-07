@@ -132,10 +132,13 @@ def _version_row(conn, template: dict[str, Any], version: str = "") -> dict[str,
     ).fetchone()
     if row:
         return dict(row)
+<<<<<<< HEAD
     return _legacy_version_row(template, selected_version)
 
 
 def _legacy_version_row(template: dict[str, Any], selected_version: str) -> dict[str, Any]:
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     return {
         "id": "",
         "template_id": template["id"],
@@ -154,6 +157,7 @@ def _legacy_version_row(template: dict[str, Any], selected_version: str) -> dict
     }
 
 
+<<<<<<< HEAD
 def _list_template_versions(conn, templates: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     """Load each template's current version with one query for a list page."""
     if not templates:
@@ -197,6 +201,8 @@ def _list_template_favorites(conn, template_ids: list[str], username: str) -> se
     return {str(row["template_id"]) for row in rows}
 
 
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 def _schema_for(template: dict[str, Any], version: dict[str, Any]) -> list[dict[str, Any]]:
     source = version.get("source") or template.get("content") or ""
     schema = json_value(version.get("variable_schema_json"), [])
@@ -220,6 +226,7 @@ def _serialize_template(
     username: str = "",
     include_detail: bool = False,
     version_name: str = "",
+<<<<<<< HEAD
     preloaded_version: dict[str, Any] | None = None,
     preloaded_favorite: bool | None = None,
 ) -> dict[str, Any]:
@@ -228,6 +235,10 @@ def _serialize_template(
         if preloaded_version is None
         else preloaded_version
     )
+=======
+) -> dict[str, Any]:
+    version = _version_row(conn, template, version_name)
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     schema = _schema_for(template, version)
     normalized_schema, normalized_examples = normalize_template_definition(
         version.get("source") or template.get("content") or "",
@@ -236,8 +247,13 @@ def _serialize_template(
     )
     schema = normalized_schema
     quality = template_quality_score(template, schema)
+<<<<<<< HEAD
     favorite = bool(preloaded_favorite) if preloaded_favorite is not None else False
     if username and preloaded_favorite is None:
+=======
+    favorite = False
+    if username:
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
         favorite = conn.execute(
             "SELECT 1 FROM config_template_favorites WHERE template_id = ? AND username = ?",
             (template["id"], username),
@@ -372,6 +388,7 @@ def list_config_templates(
             """,
             (*params, page_size, (page - 1) * page_size),
         ).fetchall()
+<<<<<<< HEAD
         template_rows = [dict(row) for row in rows]
         username = str(user.get("username") or "")
         versions_by_template = _list_template_versions(conn, template_rows)
@@ -389,6 +406,11 @@ def list_config_templates(
                 preloaded_favorite=str(template["id"]) in favorites,
             )
             for template in template_rows
+=======
+        items = [
+            _serialize_template(conn, dict(row), username=str(user.get("username") or ""))
+            for row in rows
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
         ]
         return {
             "items": items,

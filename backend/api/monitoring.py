@@ -44,7 +44,11 @@ def _require_monitoring_session(request: Request) -> dict:
     return session
 
 
+<<<<<<< HEAD
 def _monitoring_tenant_scope(user: Any, *, device_alias: str | None = None) -> tuple[str, tuple[Any, ...]]:
+=======
+def _monitoring_tenant_scope(user: Any) -> tuple[str, tuple[Any, ...]]:
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     """Return an object-level tenant predicate for legacy monitoring routes.
 
     Direct unit callers from the pre-RBAC API pass no user and retain the
@@ -53,8 +57,12 @@ def _monitoring_tenant_scope(user: Any, *, device_alias: str | None = None) -> t
     """
     if not isinstance(user, dict) or str(user.get('role') or '') == 'Administrator':
         return '', ()
+<<<<<<< HEAD
     tenant_column = f"{device_alias}.tenant_id" if device_alias else "tenant_id"
     return f" AND COALESCE({tenant_column}, 'tenant-default') = ?", (str(user.get('tenant_id') or 'tenant-default'),)
+=======
+    return " AND COALESCE(tenant_id, 'tenant-default') = ?", (str(user.get('tenant_id') or 'tenant-default'),)
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
 _SERVER_PLATFORMS = {'linux', 'ubuntu', 'centos', 'debian', 'redhat'}
 
@@ -79,7 +87,11 @@ def _is_virtual_interface_name(name: object) -> bool:
 
 _OVERVIEW_CACHE_TTL_SECONDS = 30
 _overview_cache_lock = threading.Lock()
+<<<<<<< HEAD
 _overview_cache: dict[tuple[str, str], dict[str, Any]] = {}
+=======
+_overview_cache: dict[str, dict[str, Any]] = {}
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
 
 def _monitoring_tenant_id(user: Any) -> str | None:
@@ -335,7 +347,11 @@ def search_online_devices(
     conn = get_db_connection()
     try:
         pattern = f"%{qv}%"
+<<<<<<< HEAD
         tenant_clause, tenant_params = _monitoring_tenant_scope(user, device_alias='d')
+=======
+        tenant_clause, tenant_params = _monitoring_tenant_scope(user)
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
         rows = conn.execute(
             '''
             SELECT d.id, d.hostname, d.ip_address, d.platform, d.role,
@@ -345,8 +361,12 @@ def search_online_devices(
                    d.status, d.device_category
             FROM devices d
             LEFT JOIN sites s ON s.id = d.site_id
+<<<<<<< HEAD
             WHERE d.status = 'online'
             ''' + tenant_clause + '''
+=======
+            WHERE d.status = 'online'""" + tenant_clause + """
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
               AND (LOWER(d.hostname) LIKE LOWER(?) OR LOWER(d.ip_address) LIKE LOWER(?))
             ORDER BY d.hostname ASC
             LIMIT ?
@@ -550,7 +570,11 @@ def monitoring_overview(force_refresh: bool = Query(default=False), user=require
     # keep this legacy helper restricted to the default tenant until callers
     # pass an explicit user scope.
     tenant_id = _monitoring_tenant_id(user)
+<<<<<<< HEAD
     cache_key = ('administrator', '') if tenant_id is None else ('tenant', tenant_id)
+=======
+    cache_key = tenant_id or 'administrator'
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
     if not force_refresh:
         with _overview_cache_lock:
             cached = _overview_cache.get(cache_key) or {}
@@ -658,7 +682,11 @@ def monitoring_overview(force_refresh: bool = Query(default=False), user=require
             FROM interface_telemetry_1m t
             JOIN devices d ON d.id = t.device_id
             WHERE d.status = 'online' AND t.ts_minute >= ?
+<<<<<<< HEAD
             ''' + tenant_clause + '''
+=======
+            """ + tenant_clause + """
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
             ''',
             (stats_window_start, *tenant_params),
         ).fetchone()
@@ -673,7 +701,11 @@ def monitoring_overview(force_refresh: bool = Query(default=False), user=require
             SELECT LOWER(COALESCE(a.severity, 'warning')) AS severity, COUNT(*) AS count
             FROM alert_events a LEFT JOIN devices d ON d.id = a.device_id
             WHERE a.resolved_at IS NULL AND COALESCE(a.workflow_status, 'open') != 'suppressed'
+<<<<<<< HEAD
             ''' + tenant_clause + '''
+=======
+            """ + tenant_clause + """
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
             GROUP BY LOWER(COALESCE(a.severity, 'warning'))
             '''
         , tenant_params).fetchall()
@@ -707,7 +739,11 @@ def monitoring_overview(force_refresh: bool = Query(default=False), user=require
             LEFT JOIN devices d ON d.id = a.device_id
             LEFT JOIN sites s ON s.id = d.site_id
             WHERE a.resolved_at IS NULL AND COALESCE(a.workflow_status, 'open') != 'suppressed'
+<<<<<<< HEAD
             ''' + tenant_clause + '''
+=======
+            """ + tenant_clause + """
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
             ORDER BY a.created_at DESC
             LIMIT 8
             ''',
@@ -746,7 +782,11 @@ def monitoring_overview(force_refresh: bool = Query(default=False), user=require
             FROM devices d
             LEFT JOIN sites s ON s.id = d.site_id
             WHERE (d.status IS NULL OR d.status != 'online')
+<<<<<<< HEAD
             ''' + tenant_clause + '''
+=======
+            """ + tenant_clause + """
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
             ORDER BY d.hostname ASC
             ''',
             tenant_params,

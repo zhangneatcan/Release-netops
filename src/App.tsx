@@ -68,6 +68,7 @@ const AppModals = lazy(() => import('./components/modals/AppModals').then(({ App
 
 // Types imported from ./types — re-export User as UserType to avoid clash with lucide-react User icon
 
+<<<<<<< HEAD
 type AppSharedLookupSetters = {
   sessionIdentity: string;
   setScripts: React.Dispatch<React.SetStateAction<Script[]>>;
@@ -274,6 +275,8 @@ export const useAppSharedDataRefreshLifecycle = ({
   }, [isAuthenticated, pathname, fetchSharedLookups, fetchHotData, fetchDevicesData, activeTab, inventorySubPage]);
 };
 
+=======
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
 // Sparkline imported from ./components/Sparkline
 
@@ -914,6 +917,10 @@ const App: React.FC = () => {
   const [dashBannerCollapsed, setDashBannerCollapsed] = useState(false);
   const [dashLastRefresh, setDashLastRefresh] = useState<Date>(new Date());
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+<<<<<<< HEAD
+=======
+  const skipNextRouteRefreshRef = React.useRef(false);
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
   const [isLoading, setIsLoading] = useState(true);
   const currentUserRecord = users.find(u => u.username === currentUser.username);
   const currentUserLastLogin = currentUserRecord?.lastLogin || 'Never';
@@ -1027,6 +1034,7 @@ const App: React.FC = () => {
    * which amplified backend load proportional to the user count, script
    * count and topology link count.
    */
+<<<<<<< HEAD
   const fetchSharedLookups = useAppSharedLookups({
     sessionIdentity: isAuthenticated
       ? `${currentUser.id || currentUser.username}:${fingerprintSessionToken(localStorage.getItem('netops_token') || '')}`
@@ -1037,6 +1045,38 @@ const App: React.FC = () => {
     setSelectedTemplateId,
     setGlobalVars,
   });
+=======
+  const fetchSharedLookups = useCallback(async () => {
+    try {
+      const headers = authHeaders();
+      const [scriptsRes, usersRes, templatesRes, varsRes] = await Promise.all([
+        fetch('/api/scripts', { headers }),
+        fetch('/api/users', { headers }),
+        fetch('/api/config-templates?page=1&page_size=200&sort=updated', { headers }),
+        fetch('/api/vars', { headers })
+      ]);
+
+      if (usersRes.status === 401) {
+        window.dispatchEvent(new Event('netops:auth-expired'));
+      }
+      if (scriptsRes.ok) setScripts(await scriptsRes.json());
+      if (usersRes.ok) setUsers(await usersRes.json());
+      if (templatesRes.ok) {
+        const templatePayload = await templatesRes.json();
+        const tpls: ConfigTemplate[] = Array.isArray(templatePayload)
+          ? templatePayload
+          : (templatePayload.items || []);
+        setConfigTemplates(tpls);
+        if (tpls.length > 0 && !selectedTemplateId) {
+          setSelectedTemplateId(tpls[0].id);
+        }
+      }
+      if (varsRes.ok) setGlobalVars(await varsRes.json());
+    } catch (error) {
+      console.error('Failed to fetch shared lookups:', error);
+    }
+  }, [selectedTemplateId]);
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
   /**
    * Fetch only the data that genuinely changes often (recent jobs, upcoming
@@ -1089,6 +1129,7 @@ const App: React.FC = () => {
     });
   };
 
+<<<<<<< HEAD
   useAppSharedDataRefreshLifecycle({
     isAuthenticated,
     pathname: location.pathname,
@@ -1100,6 +1141,79 @@ const App: React.FC = () => {
     fetchDevicesData,
     setIsLoading,
   });
+=======
+
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      skipNextRouteRefreshRef.current = false;
+      setIsLoading(false);
+      return;
+    }
+    // The initial-load effect and the route-change effect run together on the
+    // first authenticated render. Let the initial load own that refresh so the
+    // same lookup/hot/device requests are not issued twice.
+    skipNextRouteRefreshRef.current = true;
+    setIsLoading(true);
+    // Initial load: lookups (rarely change) + hot data (recent activity).
+    // The dashboard owns its lightweight summary request, while the inventory
+    // devices page owns its paginated query. Neither needs the shared detail list.
+    const shouldFetchSharedDevices = activeTab !== 'dashboard'
+      && !(activeTab === 'inventory' && inventorySubPage === 'devices');
+    const sharedDevicesLoad = shouldFetchSharedDevices
+      ? fetchDevicesData()
+      : Promise.resolve();
+    Promise.all([fetchSharedLookups(), fetchHotData(), sharedDevicesLoad])
+      .finally(() => setIsLoading(false));
+
+    let hotInterval: any;
+    let lookupsInterval: any;
+    let devicesInterval: any;
+
+    if (autoRefreshEnabled) {
+      // Recent activity / upcoming tasks — light, refresh frequently.
+      hotInterval = setInterval(fetchHotData, 30000);
+      // Heavy lookup tables (users / scripts / templates / vars / topology
+      // links) — slow-changing, refresh on a long cadence. Page-level
+      // forms still trigger their own fetches when they need fresh data.
+      lookupsInterval = setInterval(fetchSharedLookups, 120000);
+      // Network monitoring owns its own server-side paginated device list and
+      // telemetry polling. Refreshing the shared inventory here only causes
+      // the left-hand list and its site fallback to re-render, without adding
+      // any data to the monitoring view. Keep the shared poll for the pages
+      // that still consume the global inventory snapshot.
+      if (activeTab !== 'network-monitoring'
+        && activeTab !== 'dashboard'
+        && !(activeTab === 'inventory' && inventorySubPage === 'devices')) {
+        devicesInterval = setInterval(fetchDevicesData, 15000);
+      }
+    }
+
+    return () => {
+      if (hotInterval) clearInterval(hotInterval);
+      if (lookupsInterval) clearInterval(lookupsInterval);
+      if (devicesInterval) clearInterval(devicesInterval);
+    };
+  }, [isAuthenticated, fetchSharedLookups, fetchHotData, fetchDevicesData, activeTab, inventorySubPage, autoRefreshEnabled]);
+
+  // Force refresh when switching between submenus so returning pages always
+  // show latest data. Only refresh shared lookups on explicit route changes
+  // (not on each polling tick) to avoid the prior amplification.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (skipNextRouteRefreshRef.current) {
+      skipNextRouteRefreshRef.current = false;
+      return;
+    }
+    fetchSharedLookups();
+    fetchHotData();
+    if (activeTab !== 'network-monitoring'
+      && activeTab !== 'dashboard'
+      && !(activeTab === 'inventory' && inventorySubPage === 'devices')) {
+      fetchDevicesData();
+    }
+  }, [isAuthenticated, location.pathname, fetchSharedLookups, fetchHotData, fetchDevicesData, activeTab, inventorySubPage]);
+>>>>>>> ea1b192424ca17b84d474e92fd0f61cd7d1ad953
 
   // 合规趋势：基于过去N天任务执行成功率
   const complianceTrend = useMemo(() => {
