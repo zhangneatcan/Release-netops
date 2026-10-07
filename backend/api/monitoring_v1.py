@@ -17,7 +17,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlparse
-from urllib.request import Request as UrlRequest, ProxyHandler, build_opener
 
 from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel, Field
@@ -194,14 +193,39 @@ def _is_canonical_plan(value: Mapping[str, Any]) -> bool:
 
 
 def _reload_snmp_exporter_config() -> bool:
-    """Ask the local Compose exporter to reload its published config."""
-    request = UrlRequest("http://snmp-exporter:9116/-/reload", method="POST")
+    """Ask the local Compose exporter to reload its published config.
+
+    The Prometheus-style ``/-/reload`` endpoint expects a POST request with
+    no body.  Python's ``urllib`` adds
+    ``Content-Type: application/x-www-form-urlencoded`` on POST by default,
+    which ``prom/snmp-exporter`` rejects with HTTP 400.  ``httpx`` does not
+    add that header when no content is provided, so the exporter accepts the
+    request and reloads its config in place.  ``httpx`` is already a runtime
+    dependency (see ``backend/requirements.txt``), so no new package is
+    required.
+    """
+    import httpx
+
+    url = "http://snmp-exporter:9116/-/reload"
     try:
-        with build_opener(ProxyHandler({})).open(request, timeout=3) as response:
-            return 200 <= int(response.status) < 300
-    except Exception:
-        logger.warning("SNMP exporter configuration reload is pending", exc_info=True)
+        response = httpx.post(url, timeout=3.0)
+    except httpx.RequestError as exc:
+        logger.warning(
+            "SNMP exporter configuration reload is pending: %s: %s",
+            type(exc).__name__,
+            exc,
+        )
         return False
+
+    if 200 <= response.status_code < 300:
+        return True
+
+    logger.warning(
+        "SNMP exporter reload returned HTTP %s: %s",
+        response.status_code,
+        response.text[:200],
+    )
+    return False
 
 
 class ModuleRequest(BaseModel):
@@ -755,9 +779,6 @@ def preview_monitoring_plan(plan_id: str, _user=require_role("Viewer")):
             devices = conn.execute(device_sql, device_params).fetchall()
         except Exception:
             conn.rollback()
-            # Read-only preview remains useful on an installation where CMDB
-            # access is temporarily unavailable; the compile/apply path still
-            # fails closed when it needs real device rows.
             devices = []
         entries = config.get("modules") if isinstance(config, dict) else []
         module_rows = {
@@ -1214,8 +1235,6 @@ def _load_compile_inputs(conn, collector_id: str, user: Any = None):
             _dict(row) for row in conn.execute(interface_sql, interface_params).fetchall()
         ]
     except Exception as exc:
-        # Keep legacy installations compilable while their schema migration is
-        # pending; the dashboard still receives safe default interface labels.
         conn.rollback()
         logger.warning("[CollectorCompile] Failed to query interface profiles: %s", exc)
         interface_profiles = []
@@ -1241,9 +1260,6 @@ def _load_compile_inputs(conn, collector_id: str, user: Any = None):
                                          snmp_context_name
                                     FROM credentials""").fetchall():
             item = _dict(row)
-            # Secrets are decrypted only inside the compiler boundary so they
-            # can be written to the protected collector artifact.  They are
-            # never placed in assignments, labels, manifests, or responses.
             item["community"] = decrypt_credential(item.pop("snmp_community", "") or "") or ""
             item["password"] = decrypt_credential(item.pop("encrypted_password", "") or "") or ""
             item["auth_protocol"] = item.pop("snmp_auth_protocol", "SHA") or "SHA"
@@ -1258,7 +1274,6 @@ def _load_compile_inputs(conn, collector_id: str, user: Any = None):
     except Exception:
         conn.rollback()
         try:
-            # Fallback for environments where snmpv3 columns are not present yet
             for row in conn.execute("SELECT id, credential_type, username, snmp_community, encrypted_password FROM credentials").fetchall():
                 item = _dict(row)
                 item["community"] = decrypt_credential(item.pop("snmp_community", "") or "") or ""
@@ -1279,18 +1294,11 @@ def _load_compile_inputs(conn, collector_id: str, user: Any = None):
         if str(device.get("role") or "").lower() == "server" or "server" in str(device.get("device_category") or "").lower():
             continue
         device.setdefault("collector_id", collector_id)
-        # The vault is the sole credential resolution boundary.  Do not read
-        # device-local communities directly when a credential binding exists.
         try:
             resolved = resolve_collector_credentials(device)
-            # SNMP credentials are independent from SSH credentials. Never
-            # fall back to the device's management credential here.
             credential_id = str(device.get("snmp_credential_id") or "")
             resolved_community = str((resolved.get("snmp") or {}).get("community") or "")
             if not credential_id and resolved_community:
-                # Legacy/device-local SNMP Community is a valid alternative to
-                # a credential-center binding. Keep it ephemeral and opaque so
-                # the plaintext secret never enters assignments or the DB.
                 asset_key = str(device.get("asset_id") or device.get("id") or "")
                 credential_id = f"inline-snmp-{opaque_auth_alias(asset_key)}"
                 device["snmp_credential_id"] = credential_id
@@ -1315,8 +1323,6 @@ def _load_compile_inputs(conn, collector_id: str, user: Any = None):
                     device.get("id"), device.get("hostname") or device.get("ip_address"),
                 )
         except Exception:
-            # A legacy/incomplete CMDB row is left for the compiler to mark as
-            # unconfigured; no plaintext fallback is introduced here.
             pass
     return snmp_devices, plans, modules, variants, collectors, credentials, aliases, servers, interface_profiles
 
@@ -1404,9 +1410,6 @@ def compile_collector(collector_id: str, body: CompileRequest | None = None, _us
                 (assignment["id"], assignment["asset_id"], assignment["collector_id"], assignment["module_variant_id"], assignment.get("credential_id", ""), assignment.get("auth_alias", ""), assignment["interval_seconds"], assignment["scrape_timeout_seconds"], assignment["source_type"], assignment["source_plan_id"], assignment["assignment_hash"], now, version, now, now),
             )
         snapshot_json = json.dumps(artifact["snapshot"], ensure_ascii=False, sort_keys=True)
-        # A compiled artifact is not Last Known Good until the collector
-        # validation/publish step succeeds; the previous snapshot remains the
-        # runtime fallback while this version is being reviewed.
         conn.execute("INSERT INTO monitoring_target_snapshots (id, collector_id, config_version, snapshot_json, checksum, is_last_known_good, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)", (f"snapshot-{uuid.uuid4().hex[:16]}", collector_id, version, snapshot_json, manifest["checksum"], now))
         conn.execute("INSERT INTO monitoring_config_versions (id, collector_id, config_version, status, artifact_path, manifest_json, checksum, created_at) VALUES (?, ?, ?, 'COMPILED', ?, ?, ?, ?)", (config_id, collector_id, version, artifact.get("artifact_path") or "", json.dumps(manifest, ensure_ascii=False), manifest["checksum"], now))
         conn.execute("UPDATE monitoring_collectors SET last_config_version = ?, last_config_status = 'COMPILED', updated_at = ? WHERE id = ?", (version, now, collector_id))

@@ -94,7 +94,7 @@ GENERIC_IF_MIB_VARIANT = {
     "max_repetitions": 25,
     "retries": 2,
     "request_timeout_ms": 3000,
-    "scrape_timeout_ms": 20000,
+    "scrape_timeout_ms": 60000,
 }
 GENERIC_IF_MIB_METRICS = (
     "sysUpTime", "ifName", "ifAdminStatus", "ifOperStatus", "ifHighSpeed",
