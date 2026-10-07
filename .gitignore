@@ -177,3 +177,13 @@ tools/node/
 scripts/nexora.exe
 backend/static/nexora.exe
 *.db.bak
+
+# 本地环境配置
+docker-compose.override.yml
+
+# 备份文件
+*.back
+*.bak
+*.orig
+__pycache__/
+*.pyc
